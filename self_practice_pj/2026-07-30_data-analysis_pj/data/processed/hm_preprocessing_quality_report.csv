@@ -1,0 +1,14 @@
+metric,value
+transactions_rows,150500
+articles_rows,30503
+customers_rows,95516
+article_key_duplicates,0
+customer_key_duplicates,0
+article_unmatched_transaction_rows,0
+customer_unmatched_color_rows,33527
+invalid_or_missing_dates,0
+nonpositive_or_missing_prices,1004
+invalid_channels,803
+exact_duplicate_excess_rows,678
+main_color_analysis_rows,150500
+deduplicated_color_analysis_rows,149822

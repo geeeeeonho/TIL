@@ -1,0 +1,3 @@
+﻿,test,statistic,p_value,df1,df2,effect_size,effect_size_name,secondary_effect_size,secondary_effect_size_name,n,groups
+0,Welch ANOVA,250.27609616249302,0.0,15.0,14778.737546923347,0.022090464861207398,omega squared (pooled SS),0.02533151931404287,Welch-adjusted Cohen f^2,148294,16
+1,Kruskal-Wallis,4990.139715522512,0.0,15.0,,0.033552784064544386,epsilon squared,,,148294,16
