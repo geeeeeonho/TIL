@@ -1,0 +1,568 @@
+# Pandas 그룹화와 다변량 분석
+
+## 1. `groupby` 기본
+
+`groupby`는 데이터를 특정 기준으로 묶은 뒤 그룹별 통계값을 계산할 때 사용함.
+
+```python
+df.groupby('그룹기준')['집계대상'].집계함수()
+```
+
+* **그룹 기준**: 보통 범주형 열
+* **집계 대상**: 보통 수치형 열
+* **집계 함수**: `mean`, `sum`, `count`, `size` 등
+
+```python
+df.groupby('day')['tip'].mean()   # 요일별 팁 평균 (요일별로 tip 그룹 -> 각각 그룹 평균)
+df.groupby('day')['tip'].sum()    # 요일별 팁 합계
+df.groupby('day').size()          # 요일별 전체 행 개수
+df.groupby('day')['tip'].count()  # 요일별 결측값이 아닌 팁 개수
+```
+
+### `size`와 `count`
+
+* `size`: 결측값을 포함한 행 개수
+* `count`: 지정한 열에서 결측값을 제외한 개수
+
+---
+
+## 2. 그룹 기준 열
+
+범주형 열은 종류가 제한되어 있어 그룹 기준으로 사용하기 좋음.
+
+```python
+df.groupby('day')['tip'].mean()
+```
+
+수치형 열도 그룹 기준으로 사용할 수 있지만, 값의 종류가 너무 많으면 그룹이 지나치게 잘게 나뉨.
+
+```python
+print(df['total_bill'].nunique())  # 서로 다른 금액 개수
+print(len(df))                     # 전체 행 개수
+```
+
+따라서 연속형 수치는 구간으로 나누어 범주형 파생변수를 만든 뒤 그룹화하는 경우가 많음.
+
+---
+
+## 3. `pd.cut`으로 수치형 구간 나누기
+
+```python
+binned = df.assign(
+    금액대=pd.cut(
+        df['total_bill'],           #원본 열
+        bins=[0, 15, 30, 45, 60],   #구간 경계값
+        labels=['15달러 이하', '15~30', '30~45', '45~60']
+    )
+)
+```
+
+### 각 입력값
+
+* `df['total_bill']`: 구간으로 나눌 원본 열
+* `bins`: 구간 경계값
+* `labels`: 각 구간에 붙일 이름
+* `금액대=`: 새로 생성할 열 이름
+* `assign`: 원본을 수정하지 않고 새 DataFrame 반환
+
+```python
+binned.groupby('금액대', observed=True)['tip'].mean().round(2)
+```
+
+* `observed=True`: 실제 데이터에 존재하는 범주만 결과에 표시
+* `round(2)`: 소수점 둘째 자리까지 반올림
+
+---
+
+## 4. `assign`
+
+`assign`은 원본 DataFrame을 바꾸지 않고 열이 추가된 새로운 DataFrame을 반환함.
+
+```python
+new_df = df.assign(
+    금액대=pd.cut(
+        df['total_bill'],
+        bins=[0, 15, 30, 45, 60],
+        labels=['15달러 이하', '15~30', '30~45', '45~60']
+    )
+)
+```
+
+원본을 직접 수정하려면 다음처럼 작성함.
+
+```python
+df['금액대'] = pd.cut(
+    df['total_bill'],
+    bins=[0, 15, 30, 45, 60],
+    labels=['15달러 이하', '15~30', '30~45', '45~60']
+)
+```
+
+---
+
+# 여러 집계 계산
+
+## 5. `.agg()`
+
+`.agg()`는 하나 이상의 집계 결과를 한 번에 구할 때 사용함.
+
+집계가 하나라면 다음처럼 직접 사용할 수 있음.
+
+```python
+df.groupby('day')['tip'].mean()
+```
+
+여러 집계를 계산하려면 `agg`를 사용함.
+
+```python
+df.groupby('day')['tip'].agg(   #요일별 팁의
+    ['mean', 'sum', 'count']    #평균, 합계, 개수
+).round(3)
+```
+
+결과:
+
+* 요일별 팁 평균
+* 요일별 팁 합계
+* 요일별 팁 개수
+
+---
+
+## 6. 열마다 다른 집계 적용
+
+딕셔너리를 사용하면 열마다 다른 집계 함수를 적용할 수 있음.
+
+```python
+df.groupby('day').agg({
+    'total_bill': 'mean',
+    'tip': 'sum',
+    'size': 'max'
+}).round(3)
+```
+day를 기준으로 행(`total_bill`,`tip`,`size`)을 그룹화.
+그 후에 
+* `total_bill`: 평균
+* `tip`: 합계
+* `size`: 최댓값
+
+---
+
+## 7. 여러 열에 여러 집계 적용
+
+```python
+df.groupby('day').agg({
+    'total_bill': ['mean', 'sum', 'count'],
+    'tip': ['mean', 'sum', 'count'],
+    'size': ['mean', 'sum', 'count']
+}).round(3)
+```
+
+각 열에 평균·합계·개수를 모두 계산함.
+
+결과 열이 다중 인덱스 형태로 만들어질 수 있음.
+
+---
+
+# 여러 기준으로 그룹화
+
+## 8. 여러 열로 묶기
+
+그룹 기준을 리스트로 전달하면 여러 열의 조합별로 그룹이 생성됨.
+
+```python
+df.groupby(['day', 'time'])['total_bill'].mean()
+```
+
+`day`와 `time`의 조합별 식사 금액 평균을 계산함.
+
+예:
+
+* 목요일 × 점심
+* 목요일 × 저녁
+* 금요일 × 점심
+* 금요일 × 저녁
+
+---
+
+## 9. `as_index=False`
+
+기본적으로 그룹 기준 열은 결과의 인덱스가 됨.
+
+```python
+df.groupby('day')['tip'].mean()
+```
+
+`as_index=False`를 사용하면 그룹 기준이 일반 열로 반환됨.
+
+```python
+df.groupby(
+    'day',
+    as_index=False
+)['tip'].mean()
+```
+
+후속 분석, 병합, 저장 작업이 편해 실무에서 자주 사용함.
+
+```python
+gym.groupby(
+    ['프로그램', '회원등급'],
+    as_index=False
+)['소모칼로리'].mean()
+```
+
+---
+
+# 빈도 확인
+
+## 10. `value_counts()`
+
+`value_counts()`는 각 값이 몇 번 나타났는지 계산함.
+
+```python
+df['day'].value_counts()
+```
+
+비율로 확인하려면 `normalize=True`를 사용함.
+
+```python
+df['day'].value_counts(normalize=True)
+```
+
+백분율로 표현:
+
+```python
+df['day'].value_counts(normalize=True) * 100
+```
+
+### 차이
+
+```python
+df['day'].value_counts()
+```
+
+* 열 전체의 값별 빈도 계산
+
+```python
+df.groupby('day').size()
+```
+
+* 그룹별 행 개수 계산
+
+단순 빈도 확인은 `value_counts`, 다른 열과 함께 분석할 때는 `groupby`가 편함.
+
+---
+
+# 사용자 정의 집계
+
+## 11. `lambda` 사용
+
+기본 집계 함수로 계산할 수 없는 값은 `lambda`로 직접 작성할 수 있음.
+
+```python
+df.groupby('day')['tip'].agg(
+    lambda s: s.max() - s.min()
+)
+```
+
+* `s`: 해당 그룹의 `tip` 열
+* `s.max()`: 그룹 최댓값
+* `s.min()`: 그룹 최솟값
+* 결과: 그룹별 팁 범위
+
+---
+
+## 12. 이름을 지정하는 집계
+
+다음 형태를 **Named Aggregation**이라고 함.
+
+```python
+새열이름=('집계할 열', '집계방법')
+```
+
+```python
+summary = df.groupby('day').agg(
+    평균팁=('tip', 'mean'),
+    팁범위=('tip', lambda s: s.max() - s.min()),
+    건수=('tip', 'size')
+).round(2)
+```
+
+* `평균팁`: 팁 평균
+* `팁범위`: 팁 최댓값과 최솟값의 차이
+* `건수`: 전체 행 개수
+
+`lambda` 결과는 이름을 직접 지정하지 않으면 `<lambda_0>`처럼 표시될 수 있으므로 Named Aggregation 사용이 좋음.
+
+---
+
+## 13. 일반 함수로 집계
+
+복잡하거나 반복해서 사용할 계산은 `def` 함수로 분리할 수 있음.
+
+```python
+def generous_tip_ratio(s):
+    return (s >= 3).mean() * 100
+```
+
+```python
+df.groupby('day')['tip'].agg(
+    generous_tip_ratio
+).round(1)
+```
+
+### 계산 원리
+
+```python
+s >= 3
+```
+
+결과:
+
+```python
+True, False, True, ...
+```
+
+파이썬에서:
+
+* `True`는 `1`
+* `False`는 `0`
+
+따라서 불리언값의 평균은 `True`가 차지하는 비율이 됨.
+
+---
+
+# 범주형 열 집계
+
+범주형 데이터도 최빈값이나 점유율 등을 집계할 수 있음.
+
+```python
+summary = gym.groupby('프로그램').agg(
+    평균칼로리=('소모칼로리', 'mean'),
+    칼로리범위=('소모칼로리', lambda s: s.max() - s.min()),
+    방문건수=('소모칼로리', 'size'),
+    주요등급=('회원등급', lambda s: s.mode().iloc[0]),
+    등급점유율=(
+        '회원등급',
+        lambda s: s.value_counts(normalize=True).iloc[0] * 100
+    )
+).round(1)
+```
+
+### 각 계산
+
+```python
+s.mode().iloc[0]
+```
+
+* 가장 자주 등장한 값인 최빈값 반환
+
+```python
+s.value_counts(normalize=True)
+```
+
+* 각 값의 비율 계산
+
+```python
+.iloc[0]
+```
+
+* 가장 높은 비율 선택
+
+```python
+* 100
+```
+
+* 백분율로 변환
+
+---
+
+# `agg`와 `apply`
+
+## 14. 차이
+
+| 구분      | 전달받는 값            | 반환 형태                 | 사용 상황          |
+| ------- | ----------------- | --------------------- | -------------- |
+| `agg`   | 주로 그룹의 열 `Series` | 그룹당 하나의 요약값           | 평균, 합계, 범위 등   |
+| `apply` | 그룹 전체 `DataFrame` | 숫자, Series, DataFrame | 여러 열을 함께 계산할 때 |
+
+간단히 구분하면:
+
+```text
+한 열을 요약 → agg
+여러 열을 함께 계산 → apply
+```
+
+단, `apply`는 유연한 대신 일반적으로 `agg`보다 느림.
+
+가능하면 `agg`나 기본 집계 함수를 우선 사용하고, 여러 열을 동시에 봐야 할 때 `apply`를 사용하는 것이 좋음.
+
+---
+
+## 15. `apply` 기본 구조
+
+```python
+def 함수이름(g):
+    # g는 그룹 하나의 DataFrame
+    return 계산결과
+
+df.groupby('그룹기준').apply(함수이름)
+```
+
+`apply`는 그룹마다 숫자 하나뿐 아니라 여러 행이나 여러 열도 반환할 수 있음.
+
+---
+
+# 가중평균
+
+## 16. 단순평균과 가중평균
+
+```python
+tips_paid = [3, 1]
+people = [2, 8]
+```
+
+* 첫 번째 테이블: 팁 3달러, 2명
+* 두 번째 테이블: 팁 1달러, 8명
+
+### 단순평균
+
+각 테이블을 같은 비중으로 계산함.
+
+```python
+simple = sum(tips_paid) / len(tips_paid)
+```
+
+결과:
+
+```text
+2.0달러
+```
+
+### 가중평균
+
+테이블 인원수를 반영함.
+
+```python
+weighted = (
+    sum(tip * person for tip, person in zip(tips_paid, people))
+    / sum(people)
+)
+```
+
+결과:
+
+```text
+1.4달러
+```
+
+인원이 많은 두 번째 테이블의 팁이 1달러이므로 전체 평균이 1달러 쪽으로 내려감.
+
+---
+
+## 17. `np.average`
+
+NumPy를 사용하면 가중평균을 간단히 계산할 수 있음.
+
+```python
+import numpy as np
+
+np.average(tips_paid, weights=people)
+```
+
+* 첫 번째 인자: 평균을 구할 값
+* `weights`: 각 값의 가중치
+
+가중치를 지정하지 않으면 단순평균이 됨.
+
+```python
+np.average(tips_paid)
+```
+
+---
+
+## 18. 그룹별 가중평균
+
+가중평균은 `tip`과 `size` 두 열을 함께 사용하므로 `apply`가 적합함.
+
+```python
+import numpy as np
+
+def weighted_tip_mean(g):
+    return np.average(
+        g['tip'],
+        weights=g['size']
+    )
+```
+
+```python
+weighted = (
+    df.groupby('day')[['tip', 'size']]
+      .apply(weighted_tip_mean)
+)
+```
+
+* `g['tip']`: 평균을 구할 값
+* `g['size']`: 가중치로 사용할 인원수
+* `g`: 요일별 그룹 전체 DataFrame
+
+단순평균과 가중평균 비교:
+
+```python
+compare = pd.DataFrame({
+    '단순평균': df.groupby('day')['tip'].mean(),
+    '인원가중평균': weighted
+})
+
+display(compare.round(3))
+```
+
+가중평균이 더 높다면 인원이 많은 테이블에서 상대적으로 많은 팁이 발생했다는 의미로 해석할 수 있음.
+
+---
+
+# 핵심 문법 정리
+
+```python
+# 그룹별 평균
+df.groupby('day')['tip'].mean()
+
+# 그룹별 행 개수
+df.groupby('day').size()
+
+# 여러 기준으로 그룹화
+df.groupby(['day', 'time'])['tip'].mean()
+
+# 여러 집계
+df.groupby('day')['tip'].agg(['mean', 'sum', 'count'])
+
+# 열마다 다른 집계
+df.groupby('day').agg({
+    'total_bill': 'mean',
+    'tip': 'sum'
+})
+
+# 결과 열 이름 지정
+df.groupby('day').agg(
+    평균팁=('tip', 'mean'),
+    팁범위=('tip', lambda s: s.max() - s.min())
+)
+
+# 그룹 기준을 일반 열로 반환
+df.groupby('day', as_index=False)['tip'].mean()
+
+# 여러 열을 이용한 사용자 정의 계산
+df.groupby('day')[['tip', 'size']].apply(사용자함수)
+```
+
+## 최종 기억
+
+```text
+groupby = 기준별로 데이터 묶기
+agg = 그룹별 요약값 만들기
+apply = 그룹 전체를 이용해 자유롭게 계산하기
+pd.cut = 연속형 수치를 구간형 범주로 바꾸기
+assign = 원본을 유지하며 새 열 추가하기
+as_index=False = 그룹 기준을 일반 열로 반환하기
+size = 결측값 포함 행 개수
+count = 결측값 제외 개수
+```
